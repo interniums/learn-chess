@@ -5,7 +5,7 @@ import { Form, FormControl, FormField, FormItem } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { userSchema } from '@/shared/configs/userSchema'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/i18n/routing'
 import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -54,7 +54,7 @@ export const SignUpPage = () => {
         const { error } = await loginAction({ email, password })
 
         if (!error) {
-          return router.push('/')
+          return router.push('/wellcome') // Redirect to welcome, not root, as root usually redirects.
         }
       }
     } catch (error) {

@@ -5,12 +5,12 @@ import { Form, FormControl, FormField, FormItem } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { userSchema } from '@/shared/configs/userSchema'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/i18n/routing'
 import { useCallback, useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { toast } from 'react-toastify'
 import { LoaderCircle } from 'lucide-react'
+import { useForm } from 'react-hook-form'
 
 export const SignInPage = () => {
   const [isLoading, setIsLoading] = useState(false)

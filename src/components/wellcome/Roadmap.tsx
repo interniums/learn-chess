@@ -2,6 +2,7 @@ import { DownArrow } from '@/components/wellcome/DownArrow'
 import { ROADMAP } from '@/shared/constants/roadmap'
 import { Heart, HeartOff } from 'lucide-react'
 import Image from 'next/image'
+import { Link } from '@/i18n/routing'
 
 export const Roadmap = () => {
   return (
@@ -44,9 +45,12 @@ export const Roadmap = () => {
                   <p className="text-xs">{item.dislikes}</p>
                 </div>
               </div>
-              <button className="shadow-lg text-md font-semibold py-1 px-6 rounded-md text-cyan-50 bg-(--brown-bg)">
-                Learn
-              </button>
+              {/* TODO: Use real slugs from DB later. For now hardcode first-principles */}
+              <Link href="/first-principles/simple-mates">
+                <button className="shadow-lg text-md font-semibold py-1 px-6 rounded-md text-cyan-50 bg-(--brown-bg)">
+                  Learn
+                </button>
+              </Link>
             </div>
           </div>
         </div>

@@ -1,0 +1,10 @@
+{
+  "common": {
+    "title": "Chess Fundamentals",
+    "description": "Learn chess from the master Capablanca"
+  },
+  "navigation": {
+    "home": "Home",
+    "lessons": "Lessons"
+  }
+}
