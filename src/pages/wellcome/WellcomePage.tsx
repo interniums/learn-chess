@@ -3,14 +3,16 @@
 import { Roadmap } from '@/components/wellcome/Roadmap'
 import { useCallback, useMemo } from 'react'
 import { GetStartedModal } from '@/components/wellcome/GetStartedModal'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from '@/i18n/routing'
+import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 
 type Props = {
   user: boolean
+  firstLessonPath: string
 }
 
-export const WellcomePage = ({ user }: Props) => {
+export const WellcomePage = ({ user, firstLessonPath }: Props) => {
   const query = useSearchParams()
   const router = useRouter()
 
@@ -24,13 +26,13 @@ export const WellcomePage = ({ user }: Props) => {
   const handleToggleGetStartedModal = useCallback(() => {
     // if session exists dont open modal and redirect to lesson
     if (user) {
-      return router.push('/first-principles/simple-mates')
+      return router.push(firstLessonPath)
     }
 
     // if no session open modal
     const url = modal ? '/wellcome' : '/wellcome?modal=true'
     router.replace(url, { scroll: false })
-  }, [modal, router, user])
+  }, [modal, router, user, firstLessonPath])
 
   return (
     <>
