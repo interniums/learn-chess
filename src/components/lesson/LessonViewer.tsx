@@ -83,13 +83,11 @@ export const LessonViewer = ({ contents, onComplete, initialIndex = 0, onStepCha
                 </h3>
                 <ChessBoardComponent
                   key={currentContent.id} // Force re-mount on content change
+                  exerciseId={currentContent.id}
                   initialFen={currentContent.content.initialFen}
                   interactive={true}
                   hint={currentContent.content.hint}
                   moves={currentContent.content.moves}
-                  onComplete={() => {
-                    console.log('Exercise completed')
-                  }}
                 />
               </div>
             )}
@@ -98,42 +96,32 @@ export const LessonViewer = ({ contents, onComplete, initialIndex = 0, onStepCha
       </div>
 
       {/* Fixed Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-100 p-4 z-40">
-        <div className="max-w-2xl mx-auto w-full flex flex-col gap-4">
-          {/* Progress Bar */}
-          <div className="w-full flex flex-col gap-2">
-            <div className="flex justify-end text-xs text-gray-500 font-medium">
-              {currentIndex + 1} / {contents.length}
-            </div>
-            <div className="w-full h-1 rounded-full overflow-hidden bg-transparent">
-              {' '}
-              {/* Changed bg-gray-200 to bg-transparent */}
-              <div
-                className="h-full bg-(--brown-bg) rounded-full transition-all duration-300"
-                style={{ width: `${((currentIndex + 1) / contents.length) * 100}%` }}
-              />
-            </div>
+      <div className="fixed bottom-0 left-0 right-0 z-40 shadow-[0_-1px_6px_rgba(0,0,0,0.06)]">
+        {/* Progress Numbers - Semi-transparent */}
+        <div className="max-w-2xl mx-auto w-full px-4 pt-3 bg-white/60 backdrop-blur-sm">
+          <div className="flex justify-end text-xs text-gray-500 font-medium">
+            {currentIndex + 1} / {contents.length}
           </div>
+        </div>
 
-          {/* Buttons */}
-          <div className="w-full flex justify-center items-center gap-4">
+        {/* Buttons - Solid background */}
+        <div className="max-w-2xl mx-auto w-full px-4 pb-3 bg-white/95 backdrop-blur-xl">
+          <div className="w-full flex justify-center items-center gap-3 pt-1">
             <Button
               variant="outline"
+              size="sm"
               onClick={handlePrev}
               disabled={currentIndex === 0}
-              className="flex-1 max-w-[200px] border-slate-300 text-(--default-black) hover:bg-slate-50"
+              className="max-w-[140px] border-slate-300 text-(--default-black) hover:bg-slate-50"
             >
-              <div className="flex justify-center items-center">
-                <ChevronLeft className="mr-2 h-4 w-4" /> Previous
-              </div>
+              <ChevronLeft className="mr-1 h-4 w-4" /> Previous
             </Button>
             <Button
+              size="sm"
               onClick={handleNext}
-              className="flex-1 max-w-[200px] bg-(--brown-bg) text-white hover:bg-[#5e2900] shadow-md"
+              className="max-w-[140px] bg-(--brown-bg) text-white hover:bg-[#5e2900] shadow-md"
             >
-              <div className="flex justify-center items-center">
-                {isLast ? 'Complete' : 'Next'} <ChevronRight className="ml-2 h-4 w-4" />
-              </div>
+              {isLast ? 'Complete' : 'Next'} <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </div>

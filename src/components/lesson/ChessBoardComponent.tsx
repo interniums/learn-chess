@@ -1,236 +1,413 @@
+/**
+ * Refactored Chess Board Component
+ * Clean, maintainable, and performant implementation
+ */
+
 'use client'
 
+import { useCallback, useMemo, memo, useState } from 'react'
 import { Chess } from 'chess.js'
-import { useEffect, useState } from 'react'
 import { Chessboard } from 'react-chessboard'
-import { Lightbulb, RotateCcw, CheckCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { toast } from 'react-toastify'
+import type { PieceDropHandlerArgs } from 'react-chessboard'
+import confetti from 'canvas-confetti'
 
-// -- Types matching Database JSON Structure --
-export type MoveStep = {
-  id: number
-  correctMove: string
-  description: string
-  acceptedMoves?: string[]
-  computerMove?: string | null
-}
+// Hooks
+import { useChessGame } from '@/hooks/useChessGame'
+import { useBoardInteraction } from '@/hooks/useBoardInteraction'
+import { useBoardSettings } from '@/contexts/BoardSettingsContext'
 
-type Props = {
+// Utils
+import { playSound } from '@/utils/sounds'
+import { getCheckHighlights, getArrowCoords } from '@/utils/chess'
+
+// Components
+import { MoveFeedback } from './MoveFeedback'
+import { HintArrow } from './HintArrow'
+import { HintPanel } from './HintPanel'
+import { ExerciseControls } from './ExerciseControls'
+import { BoardSettingsPanel } from './BoardSettingsPanel'
+
+// Types
+import type { ExerciseStep } from '@/types/chess'
+
+interface ChessBoardComponentProps {
   initialFen: string
-  moves: MoveStep[]
-  hint: string
+  moves: ExerciseStep[]
+  hint?: string
   interactive?: boolean
   onComplete?: () => void
+  exerciseId: string
 }
 
-export const ChessBoardComponent = ({ initialFen, moves, hint, interactive = true, onComplete }: Props) => {
-  // 1. Determine starting position. Default to standard start if missing.
-  const startPosition = initialFen
+export const ChessBoardComponent = memo(
+  ({ initialFen, moves, hint, interactive = true, onComplete, exerciseId }: ChessBoardComponentProps) => {
+    const { settings } = useBoardSettings()
 
-  // 2. Game State
-  // We use a key on the component to force full reset if initialFen changes
-  const [game, setGame] = useState(new Chess(startPosition))
-  const [currentStepIndex, setCurrentStepIndex] = useState(0)
-  const [isCompleted, setIsCompleted] = useState(false)
-  const [wrongAttempts, setWrongAttempts] = useState(0)
-  const [showHint, setShowHint] = useState(false)
+    // Game state management
+    const {
+      game,
+      setGame,
+      currentStepIndex,
+      setCurrentStepIndex,
+      moveHistory,
+      setMoveHistory,
+      fullHistory,
+      setFullHistory,
+      isCompleted,
+      wasEverCompleted,
+      isViewMode,
+      moveStatus,
+      setMoveStatus,
+      resetGame,
+      undoMove,
+      redoMove,
+      completeExercise,
+    } = useChessGame({
+      exerciseId,
+      startPosition: initialFen,
+      moves,
+      onComplete,
+    })
 
-  // 3. Reset Effect: When prop `initialFen` changes, reset everything.
-  useEffect(() => {
-    try {
-      const newGame = new Chess(startPosition)
-      setGame(newGame)
-      setCurrentStepIndex(0)
-      setIsCompleted(false)
-      setWrongAttempts(0)
-      setShowHint(false)
-    } catch (error) {
-      console.error('Invalid initialFen:', startPosition, error)
-      // Fallback to empty or start if error
-      setGame(new Chess())
-    }
-  }, [startPosition])
+    // Wrapper for reset
+    const handleReset = useCallback(() => {
+      resetGame()
+    }, [resetGame])
 
-  // 4. Move Logic
-  function onDrop(sourceSquare: string, targetSquare: string) {
-    if (isCompleted || !interactive) return false
+    // Wrapper for undo
+    const handleUndo = useCallback(() => {
+      undoMove()
+    }, [undoMove])
 
-    // A. Validate move in Chess engine (is it legal?)
-    const gameCopy = new Chess(game.fen())
-    let move = null
-    try {
-      move = gameCopy.move({
-        from: sourceSquare,
-        to: targetSquare,
-        promotion: 'q', // always promote to queen for simplicity
-      })
-    } catch (error) {
-      console.error('Move failed:', error)
-      return false // Illegal move
-    }
+    // Board interaction state
+    const {
+      selectedSquare,
+      highlightSquares,
+      isDragging,
+      setIsDragging,
+      showMoveArrow,
+      setShowMoveArrow,
+      clearSelection,
+      selectSquare,
+      highlightMove,
+    } = useBoardInteraction(game, settings.showLegalMoves)
 
-    if (!move) return false // Illegal move
+    // Hint state
+    const [showHint, setShowHint] = useState(false)
 
-    // B. Check against Exercise Script
-    // If we have no scripted moves, allow free play (fallback)
-    if (!moves || moves.length === 0) {
-      setGame(gameCopy)
-      return true
-    }
+    // Current step (with fallback to last step if index is beyond array)
+    const currentStep = moves[currentStepIndex] || moves[moves.length - 1]
+    const displayStepIndex = Math.min(currentStepIndex, moves.length - 1)
 
-    const currentStep = moves[currentStepIndex]
-    if (!currentStep) return false
+    // Progress calculation
+    const progressPercentage = moves.length > 0 ? ((displayStepIndex + 1) / moves.length) * 100 : 0
 
-    // Check if user move matches expected correct move(s)
-    const userMoveSan = move.san
-    const isCorrect = userMoveSan === currentStep.correctMove || currentStep.acceptedMoves?.includes(userMoveSan)
+    /**
+     * Handle move execution
+     */
+    const makeMove = useCallback(
+      (sourceSquare: string, targetSquare: string): boolean => {
+        if (isCompleted || !interactive || isViewMode) return false
 
-    if (isCorrect) {
-      // 1. Update Board (User Move)
-      setGame(gameCopy)
-      toast.success('Good move!', { autoClose: 500, hideProgressBar: true })
+        const gameCopy = new Chess(game.fen())
+        // @ts-expect-error - chess.js types are strict, but our strings are valid squares
+        const piece = gameCopy.get(sourceSquare)
 
-      // 2. Handle Computer Response (if any)
-      if (currentStep.computerMove) {
-        setTimeout(() => {
-          const computerGameCopy = new Chess(gameCopy.fen())
-          try {
-            const result = computerGameCopy.move(currentStep.computerMove!)
-            if (result) {
-              setGame(computerGameCopy)
-            }
-          } catch (error) {
-            console.error('Computer move failed:', error)
+        if (!piece) return false
+
+        // Attempt move with error handling
+        let move
+        try {
+          const isPromotion = piece.type === 'p' && (targetSquare[1] === '8' || targetSquare[1] === '1')
+          move = gameCopy.move({
+            from: sourceSquare,
+            to: targetSquare,
+            ...(isPromotion && { promotion: 'q' }),
+          })
+        } catch {
+          // Invalid move, return false
+          return false
+        }
+
+        if (!move) return false
+
+        // Check if move is correct
+        const isCorrect = move.san === currentStep?.correctMove || currentStep?.acceptedMoves?.includes(move.san)
+
+        if (isCorrect) {
+          // Update game state
+          setGame(gameCopy)
+          setMoveStatus('correct')
+          const newFen = gameCopy.fen()
+          setMoveHistory((prev) => [...prev, newFen])
+          setFullHistory((prev) => [...prev, newFen])
+          clearSelection()
+          highlightMove(sourceSquare, targetSquare)
+          setShowMoveArrow(false)
+
+          // Play sound
+          if (settings.playSounds) {
+            if (gameCopy.isCheckmate()) playSound('checkmate')
+            else if (gameCopy.isCheck()) playSound('check')
+            else if (move.captured) playSound('capture')
+            else playSound('move')
           }
-        }, 500)
-      }
 
-      // 3. Advance Step
-      const nextIndex = currentStepIndex + 1
-      setCurrentStepIndex(nextIndex)
+          // Clear status
+          setTimeout(() => setMoveStatus(null), 800)
 
-      // 4. Check Completion
-      if (nextIndex >= moves.length) {
-        setIsCompleted(true)
-        toast.success('Exercise Completed!', { autoClose: 2000 })
-        if (onComplete) onComplete()
-      }
+          // Advance step
+          const nextIndex = currentStepIndex + 1
+          setCurrentStepIndex(nextIndex)
 
-      return true
-    } else {
-      // Incorrect Move
-      setWrongAttempts((prev) => prev + 1)
-      toast.error('Incorrect move. Try again.')
-      return false // Snap piece back
-    }
-  }
+          // Handle computer response
+          if (currentStep.computerMove) {
+            setTimeout(() => {
+              const computerGame = new Chess(gameCopy.fen())
+              const computerMove = computerGame.move(currentStep.computerMove!)
 
-  // 5. Reset Handler
-  const handleReset = () => {
-    try {
-      setGame(new Chess(startPosition))
-      setCurrentStepIndex(0)
-      setIsCompleted(false)
-      setWrongAttempts(0)
-      setShowHint(false)
-    } catch (e) {
-      console.error('Reset failed', e)
-    }
-  }
+              if (computerMove) {
+                setGame(computerGame)
+                const computerFen = computerGame.fen()
+                setMoveHistory((prev) => [...prev, computerFen])
+                setFullHistory((prev) => [...prev, computerFen])
+                highlightMove(computerMove.from, computerMove.to)
 
-  // 6. Determine Current Description
-  // If completed, show the description of the LAST step (often the mate/conclusion).
-  // Otherwise show description for the NEXT move the user needs to make.
-  const currentStepData = isCompleted ? moves[moves.length - 1] : moves[currentStepIndex]
+                // Play computer move sound
+                if (settings.playSounds) {
+                  if (computerGame.isCheckmate()) playSound('checkmate')
+                  else if (computerGame.isCheck()) playSound('check')
+                  else if (computerMove.captured) playSound('capture')
+                  else playSound('move')
+                }
+              }
+            }, 250)
+          }
 
-  const descriptionText = currentStepData?.description || ''
+          // Check completion
+          if (nextIndex >= moves.length) {
+            completeExercise()
+            confetti({
+              particleCount: 100,
+              spread: 70,
+              origin: { y: 0.6 },
+            })
+          }
 
-  return (
-    <div className="flex flex-col items-center gap-6 w-full max-w-[500px] mx-auto">
-      {/* Dynamic Description Area */}
-      <div className="min-h-[80px] w-full bg-slate-50 p-4 rounded-md border border-slate-100 text-center flex flex-col justify-center">
-        {descriptionText ? (
-          descriptionText.split('\\n').map((line, i) => (
-            <p key={i} className="text-(--default-black) text-sm mb-1 last:mb-0 leading-relaxed animate-in fade-in">
-              {line}
-            </p>
-          ))
-        ) : (
-          <p className="text-gray-400 italic text-sm">Make your move...</p>
-        )}
-      </div>
+          return true
+        } else {
+          // Incorrect move - execute it visually, then revert
+          const currentFen = game.fen() // Save current position
 
-      {/* Status Bar */}
-      <div className="flex justify-between w-full text-sm font-medium text-gray-600 px-1">
-        <div>
-          {isCompleted ? (
-            <span className="text-green-600 flex items-center gap-1">
-              <CheckCircle className="w-4 h-4" /> Completed
-            </span>
-          ) : (
-            <span>
-              Move {currentStepIndex + 1} / {moves.length}
-            </span>
-          )}
+          // Execute the move visually
+          setGame(gameCopy)
+          setMoveStatus('incorrect')
+          highlightMove(sourceSquare, targetSquare)
+          clearSelection()
+
+          // Play sound
+          if (settings.playSounds) {
+            if (gameCopy.isCheckmate()) playSound('checkmate')
+            else if (gameCopy.isCheck()) playSound('check')
+            else if (move.captured) playSound('capture')
+            else playSound('move')
+          }
+
+          // Revert after showing feedback
+          setTimeout(() => {
+            setGame(new Chess(currentFen))
+            setMoveStatus(null)
+          }, 800)
+
+          return false
+        }
+      },
+      [
+        game,
+        isCompleted,
+        interactive,
+        isViewMode,
+        currentStep,
+        currentStepIndex,
+        moves,
+        settings,
+        setGame,
+        setMoveStatus,
+        setMoveHistory,
+        setFullHistory,
+        setCurrentStepIndex,
+        clearSelection,
+        highlightMove,
+        setShowMoveArrow,
+        completeExercise,
+      ]
+    )
+
+    /**
+     * Drag and drop handler
+     */
+    const onPieceDrop = useCallback(
+      ({ sourceSquare, targetSquare }: PieceDropHandlerArgs): boolean => {
+        if (!targetSquare || sourceSquare === targetSquare) return false
+
+        setIsDragging(true)
+        const result = makeMove(sourceSquare, targetSquare)
+        setTimeout(() => setIsDragging(false), 100)
+        return result
+      },
+      [makeMove, setIsDragging]
+    )
+
+    /**
+     * Click handler for click-to-move
+     */
+    const onSquareClick = useCallback(
+      ({ square }: { square: string }) => {
+        if (isDragging || isCompleted || !interactive || isViewMode) return
+
+        // @ts-expect-error - chess.js types are strict, but our strings are valid squares
+        const piece = game.get(square)
+
+        if (selectedSquare) {
+          // If clicking on another piece of the same color, select it instead of moving
+          if (piece && piece.color === game.turn()) {
+            selectSquare(square)
+          } else {
+            // Try to move
+            const moved = makeMove(selectedSquare, square)
+            // If move failed, clear selection
+            if (!moved) {
+              clearSelection()
+            }
+          }
+        } else if (piece && piece.color === game.turn()) {
+          // Select piece
+          selectSquare(square)
+        }
+      },
+      [isDragging, isCompleted, interactive, isViewMode, game, selectedSquare, makeMove, selectSquare, clearSelection]
+    )
+
+    /**
+     * Right-click handler - clear selection
+     */
+    const onSquareRightClick = useCallback(() => {
+      clearSelection()
+    }, [clearSelection])
+
+    /**
+     * Toggle hint text visibility
+     */
+    const toggleHintText = useCallback(() => {
+      setShowHint((prev) => {
+        if (prev) {
+          // Hide arrow when closing hint
+          setShowMoveArrow(false)
+        }
+        return !prev
+      })
+    }, [setShowMoveArrow])
+
+    /**
+     * Toggle move arrow visibility
+     */
+    const toggleMoveArrow = useCallback(() => {
+      setShowMoveArrow((prev) => !prev)
+    }, [setShowMoveArrow])
+
+    /**
+     * Combined highlights (move + check/checkmate)
+     */
+    const combinedHighlights = useMemo(() => {
+      const checkHighlights = getCheckHighlights(game)
+      return { ...highlightSquares, ...checkHighlights }
+    }, [game, highlightSquares])
+
+    /**
+     * Arrow coordinates for hint
+     */
+    const arrowCoords = useMemo(() => {
+      if (!showMoveArrow || !currentStep?.correctMove) return null
+      return getArrowCoords(game, currentStep.correctMove)
+    }, [showMoveArrow, game, currentStep])
+
+    return (
+      <div className="flex flex-col items-center gap-3 w-full max-w-[500px] mx-auto">
+        {/* Move Title */}
+        <div className="w-full text-center h-[20px]">
+          {moves.length > 0 && <h3 className="text-sm font-semibold text-(--brown-bg)">Move {displayStepIndex + 1}</h3>}
         </div>
-        <div>Mistakes: {wrongAttempts}</div>
-      </div>
 
-      {/* Chess Board */}
-      <div className="relative w-full aspect-square shadow-xl rounded-sm overflow-hidden border-4 border-[#4b4b4b] bg-[#F0D9B5]">
-        <Chessboard
-          key={startPosition}
-          options={{
-            position: game.fen().split(' ')[0],
-            onPieceDrop: onDrop,
-            allowDragging: interactive && !isCompleted,
-            darkSquareStyle: { backgroundColor: '#B58863' },
-            lightSquareStyle: { backgroundColor: '#F0D9B5' },
-            animationDurationInMs: 300,
+        {/* Hint Panel */}
+        {currentStep?.description && (
+          <HintPanel
+            description={currentStep.description}
+            hint={hint}
+            showHint={showHint}
+            onToggleHint={toggleHintText}
+            onRevealMove={toggleMoveArrow}
+            isMoveRevealed={showMoveArrow}
+            isCompleted={wasEverCompleted}
+          />
+        )}
+
+        {/* Chess Board */}
+        <div
+          className="relative w-full aspect-square shadow-xl rounded-sm overflow-hidden bg-[#F0D9B5] [&_img]:scale-110"
+          onContextMenu={(e) => {
+            e.preventDefault()
           }}
-        />
+        >
+          {/* Chessboard with conditional blur */}
+          <div className={`transition-all duration-150 ${isCompleted ? 'blur-[1px]' : ''}`}>
+            <Chessboard
+              key={initialFen}
+              options={{
+                position: game.fen(),
+                onPieceDrop,
+                onSquareClick,
+                onSquareRightClick,
+                allowDragging: interactive && !isCompleted && !isViewMode,
+                animationDurationInMs: settings.pieceSpeed,
+                squareStyles: combinedHighlights,
+                dropSquareStyle: { boxShadow: 'none' },
+              }}
+            />
 
-        {/* Completed Overlay */}
-        {isCompleted && (
-          <div className="absolute inset-0 z-10 bg-black/10 flex items-center justify-center backdrop-blur-[1px] animate-in fade-in">
-            <div className="bg-white p-6 rounded-full shadow-2xl transform scale-110">
-              <CheckCircle className="w-16 h-16 text-green-500" />
+            {/* Hint Arrow */}
+            {arrowCoords && <HintArrow coords={arrowCoords} />}
+          </div>
+
+          {/* Move Feedback - Outside blur wrapper so it stays sharp */}
+          <MoveFeedback status={moveStatus} isCompleted={isCompleted} />
+        </div>
+
+        {/* Controls */}
+        <div className="w-full flex items-center justify-between gap-2">
+          <ExerciseControls
+            onRestart={handleReset}
+            onUndo={handleUndo}
+            onRedo={redoMove}
+            canUndo={moveHistory.length > 1}
+            canRedo={moveHistory.length < fullHistory.length}
+          />
+          <BoardSettingsPanel />
+        </div>
+
+        {/* Progress Bar */}
+        {moves.length > 0 && (
+          <div className="w-full">
+            <div className="w-full h-2 rounded-full overflow-hidden bg-gray-200">
+              <div
+                className="h-full bg-(--brown-bg) rounded-full transition-all duration-300"
+                style={{ width: `${Math.max(5, progressPercentage)}%` }}
+              />
             </div>
           </div>
         )}
       </div>
+    )
+  }
+)
 
-      {/* Controls */}
-      <div className="flex gap-3 w-full">
-        <Button
-          variant="outline"
-          onClick={handleReset}
-          className="flex-1 border-slate-300 hover:bg-slate-100 text-slate-700"
-        >
-          <RotateCcw className="w-4 h-4 mr-2" /> Restart
-        </Button>
-
-        {hint && !isCompleted && (
-          <Button
-            variant={showHint ? 'secondary' : 'outline'}
-            onClick={() => setShowHint(!showHint)}
-            className={`flex-1 border-slate-300 ${
-              showHint ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : 'text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            <Lightbulb className={`w-4 h-4 mr-2 ${showHint ? 'fill-current' : ''}`} />
-            {showHint ? 'Hide Hint' : 'Show Hint'}
-          </Button>
-        )}
-      </div>
-
-      {/* Hint Box */}
-      {showHint && hint && (
-        <div className="w-full bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-md text-sm animate-in slide-in-from-top-2">
-          <strong>Hint:</strong> {hint}
-        </div>
-      )}
-    </div>
-  )
-}
+ChessBoardComponent.displayName = 'ChessBoardComponent'

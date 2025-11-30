@@ -5,6 +5,7 @@ import { ToastContainer } from 'react-toastify'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 import { notFound } from 'next/navigation'
+import { BoardSettingsProvider } from '@/contexts/BoardSettingsContext'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -44,8 +45,10 @@ export default async function LocaleLayout({
       <link rel="icon" href="/images/favicon/knight.webp" />
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col flex-1 h-full`}>
         <NextIntlClientProvider messages={messages}>
-          <ToastContainer position="top-right" autoClose={5000} hideProgressBar theme="light" closeOnClick />
-          {children}
+          <BoardSettingsProvider>
+            <ToastContainer position="top-right" autoClose={5000} hideProgressBar theme="light" closeOnClick />
+            {children}
+          </BoardSettingsProvider>
         </NextIntlClientProvider>
       </body>
     </html>

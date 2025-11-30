@@ -37,7 +37,7 @@ export const LessonPage = ({ contents, lessonTitle, lessonId, initialIndex = 0 }
 
   return (
     <div className="bg-background min-h-screen flex flex-col">
-      <header className="p-4 border-b bg-white/80 backdrop-blur-md flex justify-between items-center shadow-sm">
+      <header className="fixed top-0 left-0 right-0 z-50 p-4 border-b bg-white/80 backdrop-blur-md flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-2">
           <button
             onClick={() => router.back()}
@@ -49,12 +49,15 @@ export const LessonPage = ({ contents, lessonTitle, lessonId, initialIndex = 0 }
         <h1 className="text-lg font-bold text-(--default-black) truncate max-w-[70%]">{lessonTitle}</h1>
         <div className="w-[60px]" /> {/* Spacer for centering */}
       </header>
-      <LessonViewer
-        contents={contents}
-        onComplete={handleComplete}
-        initialIndex={initialIndex}
-        onStepChange={handleStepChange}
-      />
+      <div className="pt-[73px]">
+        {/* Padding to account for fixed header height */}
+        <LessonViewer
+          contents={contents}
+          onComplete={handleComplete}
+          initialIndex={initialIndex}
+          onStepChange={handleStepChange}
+        />
+      </div>
     </div>
   )
 }
