@@ -11,7 +11,7 @@ export type Lesson = {
 
 export type LessonContent = {
   id: string
-  type: 'text' | 'image' | 'exercise' | 'video'
+  type: 'text' | 'image' | 'exercise' | 'video' | 'text_exercise'
   content: any
   order: number
 }

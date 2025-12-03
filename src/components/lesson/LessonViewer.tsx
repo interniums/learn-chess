@@ -23,10 +23,17 @@ type ExerciseContent = {
   moves: ExerciseStep[]
 }
 
+type TextExerciseContent = {
+  text: string
+  initialFen: string
+  hint?: string
+  moves: ExerciseStep[]
+}
+
 export type LessonContent = {
   id: string
-  type: 'text' | 'image' | 'exercise'
-  content: TextContent | ImageContent | ExerciseContent
+  type: 'text' | 'image' | 'exercise' | 'text_exercise'
+  content: TextContent | ImageContent | ExerciseContent | TextExerciseContent
 }
 
 type Props = {
@@ -43,9 +50,12 @@ export const LessonViewer = ({ lessonId, contents, onComplete, initialIndex = 0,
   const currentContent = contents[currentIndex]
   const isLast = currentIndex === contents.length - 1
 
+  const lessonProgressPercentage = contents.length > 0 ? ((currentIndex + 1) / contents.length) * 100 : 0
+
+  const isExerciseLikeStep = currentContent.type === 'exercise' || currentContent.type === 'text_exercise'
+
   // Stable ID for exercise progress per lesson + step
-  const exerciseIdForStep =
-    currentContent.type === 'exercise' ? `lesson-${lessonId}-step-${currentIndex}` : undefined
+  const exerciseIdForStep = isExerciseLikeStep ? `lesson-${lessonId}-step-${currentIndex}` : undefined
 
   const handleNext = () => {
     if (isLast) {
@@ -119,21 +129,61 @@ export const LessonViewer = ({ lessonId, contents, onComplete, initialIndex = 0,
               </div>
             )}
 
+            {currentContent.type === 'text_exercise' &&
+              (() => {
+                const { text, initialFen, hint, moves } = currentContent.content as TextExerciseContent
+
+                const paragraphs = text
+                  .split(/\n\s*\n/) // paragraphs separated by blank lines
+                  .map((p) => p.trim())
+                  .filter(Boolean)
+
+                return (
+                  <div className="w-full animate-in fade-in zoom-in-95">
+                    <div className="px-4 pb-4 pt-2">
+                      <div className="mx-auto w-full max-w-[42ch] text-[16px] leading-7 sm:text-base text-(--default-black)">
+                        <div className="prose prose-zinc dark:prose-invert max-w-none">
+                          {paragraphs.length > 0 ? (
+                            paragraphs.map((p, idx) => (
+                              <p key={idx} className="m-0 mb-3 whitespace-pre-line break-words text-left">
+                                {p}
+                              </p>
+                            ))
+                          ) : (
+                            <p className="m-0 whitespace-pre-line break-words text-left">{text}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <ChessBoardComponent
+                      key={exerciseIdForStep ?? currentContent.id}
+                      exerciseId={exerciseIdForStep ?? String(currentContent.id)}
+                      initialFen={initialFen}
+                      interactive={true}
+                      hint={hint}
+                      moves={moves}
+                      onComplete={handleExerciseComplete}
+                    />
+                  </div>
+                )
+              })()}
+
             {currentContent.type === 'exercise' && (
-          <div className="w-full animate-in fade-in zoom-in-95">
-            <h3 className="text-xl font-bold mb-4 text-center text-(--default-black)">
-              {(currentContent.content as ExerciseContent).instructions}
-            </h3>
-            <ChessBoardComponent
-              key={exerciseIdForStep ?? currentContent.id} // Force re-mount on content change but keep storage key stable
-              exerciseId={exerciseIdForStep ?? String(currentContent.id)}
-              initialFen={(currentContent.content as ExerciseContent).initialFen}
-              interactive={true}
-              hint={(currentContent.content as ExerciseContent).hint}
-              moves={(currentContent.content as ExerciseContent).moves}
-              onComplete={handleExerciseComplete}
-            />
-          </div>
+              <div className="w-full animate-in fade-in zoom-in-95">
+                <h3 className="text-xl font-bold mb-4 text-center text-(--default-black)">
+                  {(currentContent.content as ExerciseContent).instructions}
+                </h3>
+                <ChessBoardComponent
+                  key={exerciseIdForStep ?? currentContent.id} // Force re-mount on content change but keep storage key stable
+                  exerciseId={exerciseIdForStep ?? String(currentContent.id)}
+                  initialFen={(currentContent.content as ExerciseContent).initialFen}
+                  interactive={true}
+                  hint={(currentContent.content as ExerciseContent).hint}
+                  moves={(currentContent.content as ExerciseContent).moves}
+                  onComplete={handleExerciseComplete}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -146,11 +196,19 @@ export const LessonViewer = ({ lessonId, contents, onComplete, initialIndex = 0,
 
         {/* Content */}
         <div className="relative max-w-2xl mx-auto w-full px-4">
-          {/* Progress Numbers */}
-          <div className="pt-3">
+          {/* Progress Numbers + Bar */}
+          <div className="pt-3 pb-2.5 space-y-1">
             <div className="flex justify-end text-xs text-gray-500 font-medium">
               {currentIndex + 1} / {contents.length}
             </div>
+            {contents.length > 0 && (
+              <div className="w-full h-1.5 rounded-full overflow-hidden bg-gray-200">
+                <div
+                  className="h-full bg-(--brown-bg) rounded-full transition-all duration-300"
+                  style={{ width: `${Math.max(5, lessonProgressPercentage)}%` }}
+                />
+              </div>
+            )}
           </div>
 
           {/* Buttons */}

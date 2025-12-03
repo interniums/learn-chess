@@ -22,12 +22,15 @@ export const useChessGame = ({ exerciseId, startPosition, moves, onComplete }: U
   const [wasEverCompleted, setWasEverCompleted] = useState(false) // Track if exercise was ever completed
   const [moveStatus, setMoveStatus] = useState<MoveStatus>(null)
   const [isViewMode, setIsViewMode] = useState(false) // View-only mode when navigating history
+  const [hasLoadedProgress, setHasLoadedProgress] = useState(false) // Ensure we don't overwrite saved state on first mount
 
   const startPositionRef = useRef(startPosition)
 
   // Load saved progress from localStorage
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined') {
+      return
+    }
 
     const savedKey = `exercise-progress-${exerciseId}`
     const saved = localStorage.getItem(savedKey)
@@ -45,13 +48,20 @@ export const useChessGame = ({ exerciseId, startPosition, moves, onComplete }: U
         setGame(new Chess(lastFen))
       } catch (error) {
         console.error('Failed to load saved progress:', error)
+      } finally {
+        setHasLoadedProgress(true)
       }
+    } else {
+      // No saved progress – mark as loaded so we can start persisting fresh state
+      setHasLoadedProgress(true)
     }
   }, [exerciseId])
 
   // Save progress to localStorage
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || !hasLoadedProgress) {
+      return
+    }
 
     const savedKey = `exercise-progress-${exerciseId}`
     const progress: SavedProgress = {
@@ -60,7 +70,7 @@ export const useChessGame = ({ exerciseId, startPosition, moves, onComplete }: U
       isCompleted,
     }
     localStorage.setItem(savedKey, JSON.stringify(progress))
-  }, [exerciseId, currentStepIndex, moveHistory, isCompleted])
+  }, [exerciseId, currentStepIndex, moveHistory, isCompleted, hasLoadedProgress])
 
   // Reset game when startPosition changes
   useEffect(() => {

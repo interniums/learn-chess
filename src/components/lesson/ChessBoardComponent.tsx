@@ -109,9 +109,6 @@ export const ChessBoardComponent = memo(
     const currentStep = moves[currentStepIndex] || moves[moves.length - 1]
     const displayStepIndex = Math.min(currentStepIndex, moves.length - 1)
 
-    // Progress calculation
-    const progressPercentage = moves.length > 0 ? ((displayStepIndex + 1) / moves.length) * 100 : 0
-
     /**
      * Handle move execution
      */
@@ -387,9 +384,13 @@ export const ChessBoardComponent = memo(
             isCompleted={wasEverCompleted}
           />
         )}
-        {/* Move Title */}
+        {/* Move Title / Progress */}
         <div className="w-full h-[20px]">
-          {moves.length > 0 && <h3 className="text-sm font-semibold text-(--brown-bg)">Move {displayStepIndex + 1}</h3>}
+          {moves.length > 0 && (
+            <h3 className="text-sm font-semibold text-(--brown-bg)">
+              Move {displayStepIndex + 1} / {moves.length}
+            </h3>
+          )}
         </div>
 
         {/* Chess Board */}
@@ -435,18 +436,6 @@ export const ChessBoardComponent = memo(
           />
           <BoardSettingsPanel />
         </div>
-
-        {/* Progress Bar */}
-        {moves.length > 0 && (
-          <div className="w-full">
-            <div className="w-full h-2 rounded-full overflow-hidden bg-gray-200">
-              <div
-                className="h-full bg-(--brown-bg) rounded-full transition-all duration-300"
-                style={{ width: `${Math.max(5, progressPercentage)}%` }}
-              />
-            </div>
-          </div>
-        )}
       </div>
     )
   }
