@@ -55,7 +55,7 @@ export const useBoardInteraction = (game: Chess, showLegalMoves: boolean) => {
     selectedSquare,
     setSelectedSquare,
     highlightSquares,
-    setHighlightSquares,
+    setHighlightSquares, // Expose for drag handler
     isDragging,
     setIsDragging,
     showMoveArrow,

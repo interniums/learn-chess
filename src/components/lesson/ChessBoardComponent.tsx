@@ -8,7 +8,7 @@
 import { useCallback, useMemo, memo, useState } from 'react'
 import { Chess } from 'chess.js'
 import { Chessboard } from 'react-chessboard'
-import type { PieceDropHandlerArgs } from 'react-chessboard'
+import type { PieceDropHandlerArgs, PieceHandlerArgs } from 'react-chessboard'
 import confetti from 'canvas-confetti'
 
 // Hooks
@@ -18,7 +18,8 @@ import { useBoardSettings } from '@/contexts/BoardSettingsContext'
 
 // Utils
 import { playSound } from '@/utils/sounds'
-import { getCheckHighlights, getArrowCoords } from '@/utils/chess'
+import { getCheckHighlights, getArrowCoords, getLegalMovesForSquare, createLegalMoveHighlights } from '@/utils/chess'
+import type { SquareStyles } from '@/utils/chess'
 
 // Components
 import { MoveFeedback } from './MoveFeedback'
@@ -69,20 +70,11 @@ export const ChessBoardComponent = memo(
       onComplete,
     })
 
-    // Wrapper for reset
-    const handleReset = useCallback(() => {
-      resetGame()
-    }, [resetGame])
-
-    // Wrapper for undo
-    const handleUndo = useCallback(() => {
-      undoMove()
-    }, [undoMove])
-
     // Board interaction state
     const {
       selectedSquare,
       highlightSquares,
+      setHighlightSquares,
       isDragging,
       setIsDragging,
       showMoveArrow,
@@ -91,6 +83,24 @@ export const ChessBoardComponent = memo(
       selectSquare,
       highlightMove,
     } = useBoardInteraction(game, settings.showLegalMoves)
+
+    // Wrapper for reset
+    const handleReset = useCallback(() => {
+      resetGame()
+      clearSelection()
+    }, [resetGame, clearSelection])
+
+    // Wrapper for undo
+    const handleUndo = useCallback(() => {
+      undoMove()
+      clearSelection() // Clear legal move highlights
+    }, [undoMove, clearSelection])
+
+    // Wrapper for redo
+    const handleRedo = useCallback(() => {
+      redoMove()
+      clearSelection() // Clear legal move highlights
+    }, [redoMove, clearSelection])
 
     // Hint state
     const [showHint, setShowHint] = useState(false)
@@ -187,11 +197,13 @@ export const ChessBoardComponent = memo(
           // Check completion
           if (nextIndex >= moves.length) {
             completeExercise()
-            confetti({
-              particleCount: 100,
-              spread: 70,
-              origin: { y: 0.6 },
-            })
+            if (settings.showConfetti) {
+              confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 },
+              })
+            }
           }
 
           return true
@@ -244,18 +256,48 @@ export const ChessBoardComponent = memo(
     )
 
     /**
+     * Drag handler - show legal moves when dragging a piece
+     */
+    const onPieceDrag = useCallback(
+      ({ square }: PieceHandlerArgs) => {
+        if (!settings.showLegalMoves || !square) return
+
+        // @ts-expect-error - chess.js types are strict, but our strings are valid squares
+        const pieceData = game.get(square)
+        if (!pieceData || pieceData.color !== game.turn()) return
+
+        // Highlight the source square
+        const highlights: SquareStyles = {
+          [square]: { backgroundColor: 'rgba(20, 85, 30, 0.5)' }, // Lichess green
+        }
+
+        // Add legal move highlights
+        const legalMoves = getLegalMovesForSquare(game, square)
+        const legalMoveHighlights = createLegalMoveHighlights(legalMoves)
+        Object.assign(highlights, legalMoveHighlights)
+
+        setHighlightSquares(highlights)
+      },
+      [game, settings.showLegalMoves, setHighlightSquares]
+    )
+
+    /**
      * Drag and drop handler
      */
     const onPieceDrop = useCallback(
       ({ sourceSquare, targetSquare }: PieceDropHandlerArgs): boolean => {
-        if (!targetSquare || sourceSquare === targetSquare) return false
+        if (!targetSquare || sourceSquare === targetSquare) {
+          // Clear highlights on cancelled drag
+          clearSelection()
+          return false
+        }
 
         setIsDragging(true)
         const result = makeMove(sourceSquare, targetSquare)
         setTimeout(() => setIsDragging(false), 100)
         return result
       },
-      [makeMove, setIsDragging]
+      [makeMove, setIsDragging, clearSelection]
     )
 
     /**
@@ -333,11 +375,6 @@ export const ChessBoardComponent = memo(
 
     return (
       <div className="flex flex-col items-center gap-3 w-full max-w-[500px] mx-auto">
-        {/* Move Title */}
-        <div className="w-full text-center h-[20px]">
-          {moves.length > 0 && <h3 className="text-sm font-semibold text-(--brown-bg)">Move {displayStepIndex + 1}</h3>}
-        </div>
-
         {/* Hint Panel */}
         {currentStep?.description && (
           <HintPanel
@@ -350,6 +387,10 @@ export const ChessBoardComponent = memo(
             isCompleted={wasEverCompleted}
           />
         )}
+        {/* Move Title */}
+        <div className="w-full h-[20px]">
+          {moves.length > 0 && <h3 className="text-sm font-semibold text-(--brown-bg)">Move {displayStepIndex + 1}</h3>}
+        </div>
 
         {/* Chess Board */}
         <div
@@ -364,6 +405,7 @@ export const ChessBoardComponent = memo(
               key={initialFen}
               options={{
                 position: game.fen(),
+                onPieceDrag,
                 onPieceDrop,
                 onSquareClick,
                 onSquareRightClick,
@@ -387,7 +429,7 @@ export const ChessBoardComponent = memo(
           <ExerciseControls
             onRestart={handleReset}
             onUndo={handleUndo}
-            onRedo={redoMove}
+            onRedo={handleRedo}
             canUndo={moveHistory.length > 1}
             canRedo={moveHistory.length < fullHistory.length}
           />

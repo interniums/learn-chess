@@ -30,10 +30,10 @@ export default async function Lesson({ params }: Props) {
   const formattedContents = contents.map((c) => ({
     id: c.id,
     type: c.type,
-    content: c.content,
-  })) as any[]
+    content: c.content as Record<string, unknown>,
+  }))
 
-  const title = (lessonData.title as any)[locale] || (lessonData.title as any)['en'] || 'Lesson'
+  const title = lessonData.title[locale] || lessonData.title['en'] || 'Lesson'
 
   // Determine initial index from saved progress
   // Default to 0 if no progress or complete reset

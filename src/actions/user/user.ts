@@ -2,7 +2,7 @@
 
 import { createClient } from '@/supabase/server'
 
-const DEFAULT_LESSON = '/first-principles/simple-mates-rook'
+const DEFAULT_LESSON = '/first-principles/simple-mates'
 export async function getLastVisitedLesson(): Promise<string> {
   const supabase = await createClient()
 

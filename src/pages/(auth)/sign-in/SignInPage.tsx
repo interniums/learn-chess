@@ -12,7 +12,11 @@ import { toast } from 'react-toastify'
 import { LoaderCircle } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 
-export const SignInPage = () => {
+type Props = {
+  firstLessonPath: string
+}
+
+export const SignInPage = ({ firstLessonPath }: Props) => {
   const [isLoading, setIsLoading] = useState(false)
   const [responseError, setResponseError] = useState<string | null>(null)
 
@@ -51,7 +55,7 @@ export const SignInPage = () => {
       }
 
       toast.success('Successfully loged in')
-      router.push('/wellcome')
+      router.push(firstLessonPath)
     } catch (error) {
       toast.error('Unexpected error')
       console.error(error)
@@ -60,7 +64,7 @@ export const SignInPage = () => {
       setIsLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router])
+  }, [router, firstLessonPath])
 
   useEffect(() => {
     if (responseError === 'Email don`t exists') {

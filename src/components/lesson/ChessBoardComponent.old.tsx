@@ -1,6 +1,6 @@
 'use client'
 
-import { Chess } from 'chess.js'
+import { Chess, Square } from 'chess.js'
 import { useCallback, useEffect, useState, useRef } from 'react'
 import { Chessboard, PieceDropHandlerArgs } from 'react-chessboard'
 import { Lightbulb, RotateCcw, CheckCircle, Check, X, Undo2, Eye } from 'lucide-react'
@@ -58,7 +58,6 @@ export const ChessBoardComponent = ({ initialFen, moves, hint, interactive = tru
   const [highlightSquares, setHighlightSquares] = useState<Record<string, React.CSSProperties>>({})
   const [moveHistory, setMoveHistory] = useState<string[]>([startPosition])
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null)
-  const [premove, setPremove] = useState<{ from: string; to: string } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [showMoveArrow, setShowMoveArrow] = useState(false)
 
@@ -109,7 +108,6 @@ export const ChessBoardComponent = ({ initialFen, moves, hint, interactive = tru
       setHighlightSquares({})
       setMoveHistory([startPosition])
       setSelectedSquare(null)
-      setPremove(null)
       setIsDragging(false)
       setShowMoveArrow(false)
     } catch (error) {
@@ -206,10 +204,6 @@ export const ChessBoardComponent = ({ initialFen, moves, hint, interactive = tru
           }
         }
 
-        // Store premove (don't clear it yet - it will execute after computer move)
-        const savedPremove = premove
-        console.log('Correct move made, current premove:', premove)
-
         // Clear status after animation
         setTimeout(() => setMoveStatus(null), 800)
 
@@ -241,17 +235,6 @@ export const ChessBoardComponent = ({ initialFen, moves, hint, interactive = tru
                     playSound('move')
                   }
                 }
-
-                // Execute premove after delay if one was set
-                setTimeout(() => {
-                  console.log('Attempting to execute premove:', savedPremove)
-                  if (savedPremove) {
-                    const result = makeMove(savedPremove.from, savedPremove.to)
-                    console.log('Premove execution result:', result)
-                    // Clear premove after execution
-                    setPremove(null)
-                  }
-                }, 1500)
               }
             } catch (error) {
               console.error('Computer move failed:', error)
@@ -295,17 +278,7 @@ export const ChessBoardComponent = ({ initialFen, moves, hint, interactive = tru
         return false // Snap piece back
       }
     },
-    [
-      isCompleted,
-      interactive,
-      game,
-      moves,
-      currentStepIndex,
-      onComplete,
-      premove,
-      settings.showConfetti,
-      settings.playSounds,
-    ]
+    [isCompleted, interactive, game, moves, currentStepIndex, onComplete, settings.showConfetti, settings.playSounds]
   )
 
   // 7. Drag and Drop Handler
@@ -348,8 +321,7 @@ export const ChessBoardComponent = ({ initialFen, moves, hint, interactive = tru
             // Add dots/circles for legal moves
             moves.forEach((move: { to: string; captured?: string }) => {
               const targetSquare = move.to
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const targetPiece = game.get(targetSquare as any)
+              const targetPiece = game.get(targetSquare as Square)
 
               if (targetPiece) {
                 // Capture move - show ring around piece
@@ -400,8 +372,7 @@ export const ChessBoardComponent = ({ initialFen, moves, hint, interactive = tru
 
           moves.forEach((move: { to: string; captured?: string }) => {
             const targetSquare = move.to
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const targetPiece = game.get(targetSquare as any)
+            const targetPiece = game.get(targetSquare as Square)
 
             if (targetPiece) {
               moveHighlights[targetSquare] = {
@@ -434,14 +405,7 @@ export const ChessBoardComponent = ({ initialFen, moves, hint, interactive = tru
   // 9. Right Click for Premove
   const onSquareRightClick = useCallback(
     ({ square }: { square: string }) => {
-      console.log('Right click on square:', square, 'Settings:', {
-        isCompleted,
-        interactive,
-        allowPremove: settings.allowPremove,
-      })
-
-      if (isCompleted || !interactive || !settings.allowPremove) {
-        console.log('Right click blocked')
+      if (isCompleted || !interactive) {
         return
       }
 
@@ -449,28 +413,22 @@ export const ChessBoardComponent = ({ initialFen, moves, hint, interactive = tru
       if (!selectedSquare) {
         // @ts-expect-error - chess.js type definition issue
         const piece = game.get(square)
-        console.log('No square selected, piece on square:', piece)
         if (piece) {
           setSelectedSquare(square)
           setHighlightSquares({
             [square]: { backgroundColor: 'rgba(100, 149, 237, 0.4)' }, // Blue for premove
           })
-          console.log('Selected square for premove:', square)
         }
         return
       }
 
-      // Set premove
-      const premoveData = { from: selectedSquare, to: square }
-      console.log('Setting premove:', premoveData)
-      setPremove(premoveData)
       setHighlightSquares({
         [selectedSquare]: { backgroundColor: 'rgba(100, 149, 237, 0.4)' },
         [square]: { backgroundColor: 'rgba(100, 149, 237, 0.6)' },
       })
       setSelectedSquare(null)
     },
-    [isCompleted, interactive, game, selectedSquare, settings.allowPremove]
+    [isCompleted, interactive, game, selectedSquare]
   )
 
   // 10. Reset Handler
@@ -484,7 +442,6 @@ export const ChessBoardComponent = ({ initialFen, moves, hint, interactive = tru
       setHighlightSquares({})
       setMoveHistory([startPosition])
       setSelectedSquare(null)
-      setPremove(null)
       setIsDragging(false)
     } catch (e) {
       console.error('Reset failed', e)
@@ -508,7 +465,6 @@ export const ChessBoardComponent = ({ initialFen, moves, hint, interactive = tru
     setHighlightSquares({})
     setMoveStatus(null)
     setSelectedSquare(null)
-    setPremove(null)
     setIsCompleted(false) // Remove completed state when going back
   }, [moveHistory, currentStepIndex, moves])
 
@@ -679,7 +635,6 @@ export const ChessBoardComponent = ({ initialFen, moves, hint, interactive = tru
         className="relative w-full aspect-square shadow-xl rounded-sm overflow-hidden bg-[#F0D9B5] [&_img]:scale-110"
         onContextMenu={(e) => {
           e.preventDefault()
-          console.log('Context menu triggered on board container')
         }}
       >
         <Chessboard

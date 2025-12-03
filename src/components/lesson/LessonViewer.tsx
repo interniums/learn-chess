@@ -5,11 +5,28 @@ import { ChessBoardComponent } from './ChessBoardComponent'
 import Image from 'next/image'
 import { Button } from '../ui/button'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import type { ExerciseStep } from '@/types/chess'
+
+type TextContent = {
+  text: string
+}
+
+type ImageContent = {
+  src: string
+  caption?: string
+}
+
+type ExerciseContent = {
+  instructions: string
+  initialFen: string
+  hint?: string
+  moves: ExerciseStep[]
+}
 
 export type LessonContent = {
   id: string
   type: 'text' | 'image' | 'exercise'
-  content: Record<string, any>
+  content: TextContent | ImageContent | ExerciseContent
 }
 
 type Props = {
@@ -41,36 +58,57 @@ export const LessonViewer = ({ contents, onComplete, initialIndex = 0, onStepCha
     onStepChange?.(prevIndex)
   }
 
-  return (
-    <div className="flex flex-col min-h-[calc(100vh-60px)] relative">
-      {/* 
-         min-h calculation accounts for the header height (approx 60px).
-         We use relative positioning for the container.
-      */}
+  const handleExerciseComplete = () => {
+    // Save progress when exercise is completed
+    onStepChange?.(currentIndex)
+  }
 
-      <div className="flex-1 w-full max-w-2xl mx-auto p-4 pb-32">
+  return (
+    <div className="flex flex-col relative">
+      <div className="flex-1 w-full max-w-2xl mx-auto p-4 pb-24">
         {/* pb-32 ensures content isn't hidden behind fixed footer */}
 
-        <div className="flex flex-col justify-center items-center gap-8 min-h-[50vh]">
+        <div className="flex flex-col justify-center items-center gap-8">
           {/* Content */}
           <div className="w-full">
-            {currentContent.type === 'text' && (
-              <div className="prose dark:prose-invert max-w-none text-lg leading-relaxed animate-in fade-in slide-in-from-bottom-4 whitespace-pre-wrap text-(--default-black)">
-                <p>{currentContent.content.text}</p>
-              </div>
-            )}
+            {currentContent.type === 'text' &&
+              (() => {
+                const text = (currentContent.content as TextContent).text ?? ''
+                const paragraphs = text
+                  .split(/\n\s*\n/) // paragraphs separated by blank lines
+                  .map((p) => p.trim())
+                  .filter(Boolean)
+
+                return (
+                  <div className="animate-in fade-in slide-in-from-bottom-4 px-4 pb-4 pt-2">
+                    <div className="mx-auto w-full max-w-[42ch] text-[16px] leading-7 sm:text-base text-(--default-black)">
+                      <div className="prose prose-zinc dark:prose-invert max-w-none">
+                        {paragraphs.length > 0 ? (
+                          paragraphs.map((p, idx) => (
+                            <p key={idx} className="m-0 mb-3 whitespace-pre-line break-words text-left">
+                              {p}
+                            </p>
+                          ))
+                        ) : (
+                          <p className="m-0 whitespace-pre-line break-words text-left">{text}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
 
             {currentContent.type === 'image' && (
               <div className="relative w-full aspect-video rounded-lg overflow-hidden shadow-lg animate-in fade-in zoom-in-95 border border-slate-200">
                 <Image
-                  src={currentContent.content.src}
-                  alt={currentContent.content.caption || 'Lesson image'}
+                  src={(currentContent.content as ImageContent).src}
+                  alt={(currentContent.content as ImageContent).caption || 'Lesson image'}
                   fill
                   className="object-cover"
                 />
-                {currentContent.content.caption && (
+                {(currentContent.content as ImageContent).caption && (
                   <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-2 text-center text-sm">
-                    {currentContent.content.caption}
+                    {(currentContent.content as ImageContent).caption}
                   </div>
                 )}
               </div>
@@ -79,15 +117,16 @@ export const LessonViewer = ({ contents, onComplete, initialIndex = 0, onStepCha
             {currentContent.type === 'exercise' && (
               <div className="w-full animate-in fade-in zoom-in-95">
                 <h3 className="text-xl font-bold mb-4 text-center text-(--default-black)">
-                  {currentContent.content.instructions}
+                  {(currentContent.content as ExerciseContent).instructions}
                 </h3>
                 <ChessBoardComponent
                   key={currentContent.id} // Force re-mount on content change
                   exerciseId={currentContent.id}
-                  initialFen={currentContent.content.initialFen}
+                  initialFen={(currentContent.content as ExerciseContent).initialFen}
                   interactive={true}
-                  hint={currentContent.content.hint}
-                  moves={currentContent.content.moves}
+                  hint={(currentContent.content as ExerciseContent).hint}
+                  moves={(currentContent.content as ExerciseContent).moves}
+                  onComplete={handleExerciseComplete}
                 />
               </div>
             )}
@@ -96,33 +135,39 @@ export const LessonViewer = ({ contents, onComplete, initialIndex = 0, onStepCha
       </div>
 
       {/* Fixed Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 shadow-[0_-1px_6px_rgba(0,0,0,0.06)]">
-        {/* Progress Numbers - Semi-transparent */}
-        <div className="max-w-2xl mx-auto w-full px-4 pt-3 bg-white/60 backdrop-blur-sm">
-          <div className="flex justify-end text-xs text-gray-500 font-medium">
-            {currentIndex + 1} / {contents.length}
-          </div>
-        </div>
+      <div className="fixed bottom-0 left-0 right-0 z-40">
+        {/* Gradient fade background */}
+        <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-white/70 to-white/90 backdrop-blur-sm" />
 
-        {/* Buttons - Solid background */}
-        <div className="max-w-2xl mx-auto w-full px-4 pb-3 bg-white/95 backdrop-blur-xl">
-          <div className="w-full flex justify-center items-center gap-3 pt-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePrev}
-              disabled={currentIndex === 0}
-              className="max-w-[140px] border-slate-300 text-(--default-black) hover:bg-slate-50"
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" /> Previous
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleNext}
-              className="max-w-[140px] bg-(--brown-bg) text-white hover:bg-[#5e2900] shadow-md"
-            >
-              {isLast ? 'Complete' : 'Next'} <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
+        {/* Content */}
+        <div className="relative max-w-2xl mx-auto w-full px-4">
+          {/* Progress Numbers */}
+          <div className="pt-3">
+            <div className="flex justify-end text-xs text-gray-500 font-medium">
+              {currentIndex + 1} / {contents.length}
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div className="pb-3">
+            <div className="w-full flex justify-center items-center gap-3 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrev}
+                disabled={currentIndex === 0}
+                className="max-w-[140px] border-slate-300 text-(--default-black) hover:bg-slate-50"
+              >
+                <ChevronLeft className="mr-1 h-4 w-4" /> Previous
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleNext}
+                className="max-w-[140px] bg-(--brown-bg) text-white hover:bg-[#5e2900] shadow-md"
+              >
+                {isLast ? 'Complete' : 'Next'} <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>

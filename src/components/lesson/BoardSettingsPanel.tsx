@@ -48,7 +48,13 @@ export const BoardSettingsPanel = () => {
             <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setIsOpen(false)} />
 
             {/* Settings Modal (with animation) */}
-            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-sm bg-white rounded-lg shadow-2xl border border-slate-200 p-4 z-[51] animate-in fade-in duration-200">
+            <div 
+              className="fixed top-1/2 left-1/2 w-[90%] max-w-sm bg-white rounded-lg shadow-2xl border border-slate-200 p-4 z-[51]"
+              style={{
+                transform: 'translate(-50%, -50%)',
+                animation: 'fadeIn 200ms ease-out'
+              }}
+            >
               {/* Header */}
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-slate-800">Board Settings</h3>

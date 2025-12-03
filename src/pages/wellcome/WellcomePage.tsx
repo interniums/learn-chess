@@ -37,7 +37,7 @@ export const WellcomePage = ({ user, firstLessonPath }: Props) => {
   return (
     <>
       {/* get started modal */}
-      <GetStartedModal isOpen={!!modal} onOpen={handleToggleGetStartedModal} />
+      <GetStartedModal isOpen={!!modal} onOpen={handleToggleGetStartedModal} firstLessonPath={firstLessonPath} />
 
       <div className="flex flex-col items-center flex-1 h-full pt-[70px]">
         {/* header */}

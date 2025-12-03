@@ -1,16 +1,17 @@
 import { Dispatch, FC, SetStateAction, useCallback, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
-import { anonymousLoginAction } from '@/actions/auth/auth'
 import { useRouter, Link } from '@/i18n/routing'
 import { toast } from 'react-toastify'
 import Image from 'next/image'
+import { createClient as createBrowserSupabaseClient } from '@/supabase/client'
 
 type Props = {
   isOpen: boolean
   onOpen: Dispatch<SetStateAction<boolean>>
+  firstLessonPath?: string
 }
 
-export const GetStartedModal: FC<Props> = ({ isOpen, onOpen }) => {
+export const GetStartedModal: FC<Props> = ({ isOpen, onOpen, firstLessonPath }) => {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
@@ -18,36 +19,35 @@ export const GetStartedModal: FC<Props> = ({ isOpen, onOpen }) => {
     if (isLoading) return
 
     setIsLoading(true)
-    const { success, error } = await anonymousLoginAction()
+    try {
+      const supabase = await createBrowserSupabaseClient()
+      const { error } = await supabase.auth.signInAnonymously()
 
-    if (error) {
+      if (error) {
+        toast.error(error.message ?? 'Unable to start anonymous session')
+        setIsLoading(false)
+        return
+      }
+
+      // Redirect to first lesson after anonymous login
+      const redirectPath = firstLessonPath || '/wellcome'
+      router.push(redirectPath)
+    } catch (err) {
+      console.error('Anonymous login error:', err)
+      toast.error('Unexpected error while starting anonymous session')
       setIsLoading(false)
-      toast.error(error)
-      return
     }
-
-    if (success) {
-      // NOTE: We could also pass this path from props if we want it dynamic
-      // For now, if user success, the page might re-render or we force navigation
-      // But since we are client side, we need to know WHERE to go.
-      // Ideally we refresh wellcome page and let it handle the redirect?
-      // Or just hardcode fallback for now and let user click 'Start Learning' again if they prefer.
-      // But better UX is direct redirect.
-      return router.push('/wellcome') // Redirecting to wellcome will trigger the "user exists" logic if we click button?
-      // Actually, if we redirect to /wellcome, the server component re-runs, finds user, passes user=true.
-      // But the user is still on the same page visually.
-      // Let's redirect to the first lesson directly if possible, or reload.
-      // router.refresh() might work, but let's push to wellcome to be safe.
-    }
-    setIsLoading(false)
-  }, [isLoading, router])
+  }, [isLoading, router, firstLessonPath])
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpen}>
       <DialogContent className="w-[341px]">
         <DialogHeader>
           <DialogTitle>Create an account</DialogTitle>
-          <DialogDescription>Only users with an account able to save their progress.</DialogDescription>
+          <DialogDescription>
+            Create an account to sync your progress across devices, or continue without an account to save your
+            progress anonymously on this device.
+          </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-[24px] items-center w-full relative">
           <div className="relative w-full h-[293px]">

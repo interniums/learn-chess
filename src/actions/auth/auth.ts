@@ -22,101 +22,44 @@ type AnonymousLoginResponse = {
 }
 
 export async function createAccountAction({ email, password }: Props): Promise<CreateAccountResponse> {
-  if (!email || !password) {
-    return { error: 'No data provided' }
-  }
+  if (!email || !password) return { error: 'No data provided' }
 
   const supabase = await createClient()
 
-  try {
-    const { data: existingUser, error: userCheckError } = await supabase
-      .from('users')
-      .select('email')
-      .eq('email', email)
-      .single()
+  const { data, error: signUpError } = await supabase.auth.signUp({ email, password })
 
-    if (userCheckError && userCheckError.code !== 'PGRST116') {
-      // Ensure it's not a "not found" error
-      return { error: 'Error while searching for dublicate email' }
-    }
-
-    if (existingUser) {
-      return { error: 'Email already exists' }
-    }
-
-    // Create user session
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-    })
-
-    if (signUpError) {
-      return { error: 'Error while creating a user' }
-    }
-
-    if (!data.session || !data.user) {
-      return { error: 'User or session wasn`t created' }
-    }
-
-    // Save user to the database
-    const { data: user, error: saveUserError } = await supabase.from('users').insert([{ email }]).select()
-
-    if (saveUserError) {
-      return { error: 'Error while saving user into db' }
-    }
-
-    if (user) {
-      return { error: null, success: true }
-    }
-
-    return { error: 'User wasn`t created' }
-  } catch (error) {
-    console.error(error)
-    return { error: `Unexpected error, ${error}` }
+  if (signUpError) {
+    return { error: signUpError.message }
   }
+
+  if (!data.user) return { error: 'User wasn`t created' }
+
+  // If you require email confirmation, session may be null here — that's OK.
+  const { error: saveUserError } = await supabase
+    .from('users')
+    .upsert({ id: data.user.id, email }, { onConflict: 'id' })
+
+  if (saveUserError) {
+    console.log('saveUserError', saveUserError)
+    return { error: 'Error while saving user into db' }
+  }
+
+  return { error: null, success: true }
 }
 
 export async function loginAction({ email, password }: Props): Promise<LoginResponse> {
-  if (!email || !password) {
-    return { error: 'No data provided' }
-  }
+  if (!email || !password) return { error: 'No data provided' }
 
   const supabase = await createClient()
 
-  try {
-    const { data: existingUser, error: userCheckError } = await supabase
-      .from('users')
-      .select('email')
-      .eq('email', email)
-      .single()
+  const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password })
+  if (loginError) return { error: loginError.message }
+  if (!data.user) return { error: 'User wasn`t retrieved' }
 
-    if (userCheckError) {
-      return { error: 'Error while searching for user' }
-    }
+  // optional: ensure profile exists
+  await supabase.from('users').upsert({ id: data.user.id, email: data.user.email }, { onConflict: 'id' })
 
-    if (!existingUser) {
-      return { error: 'Email don`t exists' }
-    }
-
-    // Create user session
-    const { data, error: loginError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (loginError) {
-      return { error: 'Error while login' }
-    }
-
-    if (!data.session || !data.user) {
-      return { error: 'User or session wasn`t retrieved' }
-    }
-
-    return { error: null }
-  } catch (error) {
-    console.error(error)
-    return { error: `Unexpected error, ${error}` }
-  }
+  return { error: null }
 }
 
 export async function anonymousLoginAction(): Promise<AnonymousLoginResponse> {

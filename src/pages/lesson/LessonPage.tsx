@@ -18,7 +18,15 @@ export const LessonPage = ({ contents, lessonTitle, lessonId, initialIndex = 0 }
 
   const handleStepChange = async (index: number) => {
     // Save progress quietly
-    await updateProgressAction(lessonId, index)
+    try {
+      const result = await updateProgressAction(lessonId, index)
+      if (result?.error) {
+        toast.error(`Failed to save progress: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error saving progress:', error)
+      toast.error('Error saving progress')
+    }
   }
 
   const handleComplete = async () => {
@@ -36,11 +44,11 @@ export const LessonPage = ({ contents, lessonTitle, lessonId, initialIndex = 0 }
   }
 
   return (
-    <div className="bg-background min-h-screen flex flex-col">
+    <div className="bg-background min-h-screen flex flex-col pt-[70px]">
       <header className="fixed top-0 left-0 right-0 z-50 p-4 border-b bg-white/80 backdrop-blur-md flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push('/wellcome')}
             className="text-sm flex items-center gap-1 text-(--default-black) hover:text-(--brown-bg) transition-colors"
           >
             <ChevronLeft className="w-4 h-4" /> Back
@@ -49,15 +57,12 @@ export const LessonPage = ({ contents, lessonTitle, lessonId, initialIndex = 0 }
         <h1 className="text-lg font-bold text-(--default-black) truncate max-w-[70%]">{lessonTitle}</h1>
         <div className="w-[60px]" /> {/* Spacer for centering */}
       </header>
-      <div className="pt-[73px]">
-        {/* Padding to account for fixed header height */}
-        <LessonViewer
-          contents={contents}
-          onComplete={handleComplete}
-          initialIndex={initialIndex}
-          onStepChange={handleStepChange}
-        />
-      </div>
+      <LessonViewer
+        contents={contents}
+        onComplete={handleComplete}
+        initialIndex={initialIndex}
+        onStepChange={handleStepChange}
+      />
     </div>
   )
 }

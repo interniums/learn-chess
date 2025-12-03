@@ -12,7 +12,11 @@ import { z } from 'zod'
 import { ToastContainer, toast } from 'react-toastify'
 import { LoaderCircle } from 'lucide-react'
 
-export const SignUpPage = () => {
+type Props = {
+  firstLessonPath: string
+}
+
+export const SignUpPage = ({ firstLessonPath }: Props) => {
   const [isLoading, setIsLoading] = useState(false)
   const [responseError, setResponseError] = useState<string | null>(null)
 
@@ -54,7 +58,7 @@ export const SignUpPage = () => {
         const { error } = await loginAction({ email, password })
 
         if (!error) {
-          return router.push('/wellcome') // Redirect to welcome, not root, as root usually redirects.
+          return router.push(firstLessonPath || '/first-principles/simple-mates')
         }
       }
     } catch (error) {
@@ -65,7 +69,7 @@ export const SignUpPage = () => {
       setIsLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router])
+  }, [router, firstLessonPath])
 
   useEffect(() => {
     if (responseError === 'Email already exists') {
