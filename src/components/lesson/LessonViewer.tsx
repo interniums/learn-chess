@@ -5,7 +5,7 @@ import { ChessBoardComponent } from './ChessBoardComponent'
 import Image from 'next/image'
 import { Button } from '../ui/button'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import type { ExerciseStep } from '@/types/chess'
+import type { GoalExerciseConfig } from '@/types/chess'
 
 type TextContent = {
   text: string
@@ -16,18 +16,25 @@ type ImageContent = {
   caption?: string
 }
 
+type DemoConfig = {
+  moves: string[]
+  description?: string
+}
+
 type ExerciseContent = {
   instructions: string
   initialFen: string
   hint?: string
-  moves: ExerciseStep[]
+  goal: GoalExerciseConfig
+  demo?: DemoConfig
 }
 
 type TextExerciseContent = {
   text: string
   initialFen: string
   hint?: string
-  moves: ExerciseStep[]
+  goal: GoalExerciseConfig
+  demo?: DemoConfig
 }
 
 export type LessonContent = {
@@ -88,7 +95,9 @@ export const LessonViewer = ({ lessonId, contents, onComplete, initialIndex = 0,
           <div className="w-full">
             {currentContent.type === 'text' &&
               (() => {
-                const text = (currentContent.content as TextContent).text ?? ''
+                const rawText = (currentContent.content as TextContent).text ?? ''
+                // Normalize literal "\\n" sequences coming from SQL/JSON into real newlines
+                const text = rawText.replace(/\\n/g, '\n')
                 const paragraphs = text
                   .split(/\n\s*\n/) // paragraphs separated by blank lines
                   .map((p) => p.trim())
@@ -131,8 +140,9 @@ export const LessonViewer = ({ lessonId, contents, onComplete, initialIndex = 0,
 
             {currentContent.type === 'text_exercise' &&
               (() => {
-                const { text, initialFen, hint, moves } = currentContent.content as TextExerciseContent
+                const { text: rawText, initialFen, hint, goal, demo } = currentContent.content as TextExerciseContent
 
+                const text = rawText.replace(/\\n/g, '\n')
                 const paragraphs = text
                   .split(/\n\s*\n/) // paragraphs separated by blank lines
                   .map((p) => p.trim())
@@ -162,7 +172,8 @@ export const LessonViewer = ({ lessonId, contents, onComplete, initialIndex = 0,
                       initialFen={initialFen}
                       interactive={true}
                       hint={hint}
-                      moves={moves}
+                      goal={goal}
+                      demo={demo}
                       onComplete={handleExerciseComplete}
                     />
                   </div>
@@ -180,7 +191,8 @@ export const LessonViewer = ({ lessonId, contents, onComplete, initialIndex = 0,
                   initialFen={(currentContent.content as ExerciseContent).initialFen}
                   interactive={true}
                   hint={(currentContent.content as ExerciseContent).hint}
-                  moves={(currentContent.content as ExerciseContent).moves}
+                  goal={(currentContent.content as ExerciseContent).goal}
+                  demo={(currentContent.content as ExerciseContent).demo}
                   onComplete={handleExerciseComplete}
                 />
               </div>

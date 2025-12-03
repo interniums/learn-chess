@@ -33,7 +33,12 @@ export default async function Lesson({ params }: Props) {
     content: c.content as Record<string, unknown>,
   }))
 
-  const title = lessonData.title[locale] || lessonData.title['en'] || 'Lesson'
+  // Title can be a simple string (new schema) or a localized object (old schema)
+  const rawTitle = (lessonData as any).title
+  const title =
+    typeof rawTitle === 'string'
+      ? rawTitle
+      : rawTitle?.[locale] || rawTitle?.['en'] || 'Lesson'
 
   // Determine initial index from saved progress
   // Default to 0 if no progress or complete reset

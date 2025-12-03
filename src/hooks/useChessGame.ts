@@ -1,27 +1,24 @@
 /**
- * Custom hook for managing chess game state
+ * Custom hook for managing chess game state for goal-based exercises
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Chess } from 'chess.js'
-import type { ExerciseStep, MoveStatus, SavedProgress } from '@/types/chess'
+import type { MoveStatus, SavedProgress } from '@/types/chess'
 
 interface UseChessGameProps {
   exerciseId: string
   startPosition: string
-  moves: ExerciseStep[]
   onComplete?: () => void
 }
 
-export const useChessGame = ({ exerciseId, startPosition, moves, onComplete }: UseChessGameProps) => {
+export const useChessGame = ({ exerciseId, startPosition, onComplete }: UseChessGameProps) => {
   const [game, setGame] = useState<Chess>(new Chess(startPosition))
-  const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [moveHistory, setMoveHistory] = useState<string[]>([startPosition])
   const [fullHistory, setFullHistory] = useState<string[]>([startPosition]) // Full history including undone moves
   const [isCompleted, setIsCompleted] = useState(false)
-  const [wasEverCompleted, setWasEverCompleted] = useState(false) // Track if exercise was ever completed
+  const [wasEverCompleted, setWasEverCompleted] = useState(false)
   const [moveStatus, setMoveStatus] = useState<MoveStatus>(null)
-  const [isViewMode, setIsViewMode] = useState(false) // View-only mode when navigating history
   const [hasLoadedProgress, setHasLoadedProgress] = useState(false) // Ensure we don't overwrite saved state on first mount
 
   const startPositionRef = useRef(startPosition)
@@ -38,10 +35,12 @@ export const useChessGame = ({ exerciseId, startPosition, moves, onComplete }: U
     if (saved) {
       try {
         const progress: SavedProgress = JSON.parse(saved)
-        setCurrentStepIndex(progress.currentStepIndex)
         setMoveHistory(progress.moveHistory)
         setFullHistory(progress.moveHistory) // Initialize fullHistory with current moveHistory
         setIsCompleted(progress.isCompleted)
+        if (progress.isCompleted) {
+          setWasEverCompleted(true)
+        }
 
         // Restore game to last position
         const lastFen = progress.moveHistory[progress.moveHistory.length - 1]
@@ -65,35 +64,32 @@ export const useChessGame = ({ exerciseId, startPosition, moves, onComplete }: U
 
     const savedKey = `exercise-progress-${exerciseId}`
     const progress: SavedProgress = {
-      currentStepIndex,
       moveHistory,
       isCompleted,
     }
     localStorage.setItem(savedKey, JSON.stringify(progress))
-  }, [exerciseId, currentStepIndex, moveHistory, isCompleted, hasLoadedProgress])
+  }, [exerciseId, moveHistory, isCompleted, hasLoadedProgress])
 
   // Reset game when startPosition changes
   useEffect(() => {
     if (startPosition !== startPositionRef.current) {
       setGame(new Chess(startPosition))
-      setCurrentStepIndex(0)
       setMoveHistory([startPosition])
       setFullHistory([startPosition]) // Reset full history too
       setIsCompleted(false)
       setMoveStatus(null)
+      setWasEverCompleted(false)
       startPositionRef.current = startPosition
     }
   }, [startPosition])
 
   const resetGame = useCallback(() => {
     setGame(new Chess(startPosition))
-    setCurrentStepIndex(0)
     setMoveHistory([startPosition])
     setFullHistory([startPosition]) // Reset full history too
     setIsCompleted(false)
-    setWasEverCompleted(false) // Reset completion tracking
+    setWasEverCompleted(false)
     setMoveStatus(null)
-    setIsViewMode(false) // Exit view mode
 
     // Clear saved progress
     if (typeof window !== 'undefined') {
@@ -103,51 +99,33 @@ export const useChessGame = ({ exerciseId, startPosition, moves, onComplete }: U
   }, [startPosition, exerciseId])
 
   const undoMove = useCallback(() => {
-    if (moveHistory.length <= 1 || currentStepIndex === 0) return
+    if (moveHistory.length <= 1) return
 
-    // Enter view mode when going back in history
-    setIsViewMode(true)
-
-    // Check if the previous step had a computer move
-    const previousStep = moves[currentStepIndex - 1]
-    const stepsToRemove = previousStep?.computerMove ? 2 : 1
-
-    const newHistory = moveHistory.slice(0, -stepsToRemove)
+    const newHistory = moveHistory.slice(0, -1)
     const previousFen = newHistory[newHistory.length - 1]
 
     setGame(new Chess(previousFen))
     setMoveHistory(newHistory)
-    setCurrentStepIndex((prev: number) => Math.max(0, prev - 1))
     setIsCompleted(false)
     setMoveStatus(null)
-  }, [moveHistory, currentStepIndex, moves])
+  }, [moveHistory])
 
   const redoMove = useCallback(() => {
     // Check if there are moves to redo
     if (moveHistory.length >= fullHistory.length) return
 
-    // Check if the current step has a computer move
-    const currentStep = moves[currentStepIndex]
-    const stepsToAdd = currentStep?.computerMove ? 2 : 1
-
-    const newHistoryLength = Math.min(moveHistory.length + stepsToAdd, fullHistory.length)
+    const newHistoryLength = moveHistory.length + 1
     const newHistory = fullHistory.slice(0, newHistoryLength)
     const newFen = newHistory[newHistory.length - 1]
 
     setGame(new Chess(newFen))
     setMoveHistory(newHistory)
-    setCurrentStepIndex((prev: number) => Math.min(prev + 1, moves.length))
     setMoveStatus(null)
-
-    // Exit view mode if we've reached the current position (no more moves to redo)
-    if (newHistoryLength >= fullHistory.length) {
-      setIsViewMode(false)
-    }
-  }, [moveHistory, fullHistory, currentStepIndex, moves])
+  }, [moveHistory, fullHistory])
 
   const completeExercise = useCallback(() => {
     setIsCompleted(true)
-    setWasEverCompleted(true) // Mark as ever completed
+    setWasEverCompleted(true)
     if (onComplete) {
       onComplete()
     }
@@ -156,16 +134,12 @@ export const useChessGame = ({ exerciseId, startPosition, moves, onComplete }: U
   return {
     game,
     setGame,
-    currentStepIndex,
-    setCurrentStepIndex,
     moveHistory,
     setMoveHistory,
     fullHistory,
     setFullHistory,
     isCompleted,
     wasEverCompleted,
-    isViewMode,
-    setIsViewMode,
     moveStatus,
     setMoveStatus,
     resetGame,

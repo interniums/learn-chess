@@ -45,17 +45,27 @@ export const LessonPage = ({ contents, lessonTitle, lessonId, initialIndex = 0 }
 
   return (
     <div className="bg-background min-h-screen flex flex-col pt-[70px]">
-      <header className="fixed top-0 left-0 right-0 z-50 p-4 border-b bg-white/80 backdrop-blur-md flex justify-between items-center shadow-sm">
-        <div className="flex items-center gap-2">
+      <header className="fixed top-0 left-0 right-0 z-50 px-3 py-3 border-b bg-white/80 backdrop-blur-md flex items-center shadow-sm">
+        {/* Left: icon-only back button */}
+        <div className="w-[40px] flex justify-start">
           <button
             onClick={() => router.push('/wellcome')}
-            className="text-sm flex items-center gap-1 text-(--default-black) hover:text-(--brown-bg) transition-colors"
+            className="flex items-center justify-center w-8 h-8 rounded-full text-(--default-black) hover:bg-slate-100 hover:text-(--brown-bg) transition-colors"
+            aria-label="Back"
           >
-            <ChevronLeft className="w-4 h-4" /> Back
+            <ChevronLeft className="w-5 h-5" />
           </button>
         </div>
-        <h1 className="text-lg font-bold text-(--default-black) truncate max-w-[70%]">{lessonTitle}</h1>
-        <div className="w-[60px]" /> {/* Spacer for centering */}
+
+        {/* Center: lesson title */}
+        <div className="flex-1 flex justify-center">
+          <h1 className="text-base sm:text-lg font-bold text-(--default-black) truncate max-w-[80%] text-center">
+            {lessonTitle}
+          </h1>
+        </div>
+
+        {/* Right: spacer to balance layout */}
+        <div className="w-[40px]" />
       </header>
       <LessonViewer
         lessonId={lessonId}
