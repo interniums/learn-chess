@@ -30,17 +30,22 @@ export type LessonContent = {
 }
 
 type Props = {
+  lessonId: string
   contents: LessonContent[]
   onComplete?: () => void
   initialIndex?: number
   onStepChange?: (index: number) => void
 }
 
-export const LessonViewer = ({ contents, onComplete, initialIndex = 0, onStepChange }: Props) => {
+export const LessonViewer = ({ lessonId, contents, onComplete, initialIndex = 0, onStepChange }: Props) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
 
   const currentContent = contents[currentIndex]
   const isLast = currentIndex === contents.length - 1
+
+  // Stable ID for exercise progress per lesson + step
+  const exerciseIdForStep =
+    currentContent.type === 'exercise' ? `lesson-${lessonId}-step-${currentIndex}` : undefined
 
   const handleNext = () => {
     if (isLast) {
@@ -115,20 +120,20 @@ export const LessonViewer = ({ contents, onComplete, initialIndex = 0, onStepCha
             )}
 
             {currentContent.type === 'exercise' && (
-              <div className="w-full animate-in fade-in zoom-in-95">
-                <h3 className="text-xl font-bold mb-4 text-center text-(--default-black)">
-                  {(currentContent.content as ExerciseContent).instructions}
-                </h3>
-                <ChessBoardComponent
-                  key={currentContent.id} // Force re-mount on content change
-                  exerciseId={currentContent.id}
-                  initialFen={(currentContent.content as ExerciseContent).initialFen}
-                  interactive={true}
-                  hint={(currentContent.content as ExerciseContent).hint}
-                  moves={(currentContent.content as ExerciseContent).moves}
-                  onComplete={handleExerciseComplete}
-                />
-              </div>
+          <div className="w-full animate-in fade-in zoom-in-95">
+            <h3 className="text-xl font-bold mb-4 text-center text-(--default-black)">
+              {(currentContent.content as ExerciseContent).instructions}
+            </h3>
+            <ChessBoardComponent
+              key={exerciseIdForStep ?? currentContent.id} // Force re-mount on content change but keep storage key stable
+              exerciseId={exerciseIdForStep ?? String(currentContent.id)}
+              initialFen={(currentContent.content as ExerciseContent).initialFen}
+              interactive={true}
+              hint={(currentContent.content as ExerciseContent).hint}
+              moves={(currentContent.content as ExerciseContent).moves}
+              onComplete={handleExerciseComplete}
+            />
+          </div>
             )}
           </div>
         </div>

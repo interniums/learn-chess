@@ -58,6 +58,7 @@ export const LessonPage = ({ contents, lessonTitle, lessonId, initialIndex = 0 }
         <div className="w-[60px]" /> {/* Spacer for centering */}
       </header>
       <LessonViewer
+        lessonId={lessonId}
         contents={contents}
         onComplete={handleComplete}
         initialIndex={initialIndex}
